@@ -99,8 +99,7 @@ def block_field(block, field):
         u = block.radial_four_velocity
         w = block.polar_four_velocity
         G = (1.0 + u**2 + w**2)**0.5
-        s = block.scalar * block.comoving_mass_density * G
-        return s
+        return block.scalar * block.comoving_mass_density * G
 
     elif field == 'energy':
         # Return the total gas energy. Assumes the gamma-law index is 4/3.
@@ -111,7 +110,7 @@ def block_field(block, field):
         G = (1.0 + u**2 + w**2)**0.5
         e = p / d / (4 / 3 - 1)
         h = c**2 + e + p / d
-        data = d * h * G**2 - p - G * d * c**2
+        return d * h * G**2 - p - G * d * c**2
 
     elif field == 'gamma_beta':
         ur = block.radial_four_velocity
@@ -195,13 +194,13 @@ def plot_radial_profile(products, args):
         tidx  = args.theta_index
         d = block_field(products.radial_profile[tidx], args.field)
 
-    ax1.set_title(r'Setup: $\mathtt{{{}}}$    $\theta={:.2f}$   $t = {:.4}s$'.format(setup.replace('_', '-'), q[tidx], products.time))
-    ax1.set_ylabel(label_name(args))
+    ax1.set_title(r'Setup: $\mathtt{{{}}}$    $\theta={:.2f}$   $t = {:.4}s$'.format(setup.replace('_', '-'), q[tidx], products.time), fontsize=20)
+    ax1.set_ylabel(label_name(args), fontsize=15)
     ax1.plot(r, d, '-o', mfc='none')
     ax1.set_xlim(r[0], r[-1])
     ax1.set_xscale('log')
     ax1.set_yscale('log')
-    ax1.set_xlabel(r'$r \ \rm{[cm]}$')
+    ax1.set_xlabel(r'$r \ \rm{[cm]}$', fontsize=15)
     return fig
 
 

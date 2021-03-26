@@ -171,6 +171,7 @@ def plot_radial_profile(products, args):
                                                                                          q[tidx], products.time))
     ax1.set_ylabel('{}'.format(variable(args)))
     ax1.plot(r, d, '-o', mfc='none')
+    ax1.set_xlim(r[0], r[-1])
     ax1.set_xscale('log')
     ax1.set_yscale('log')
     ax1.set_xlabel(r'$r \ \rm{[cm]}$')

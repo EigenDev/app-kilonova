@@ -229,7 +229,7 @@ impl JetInStar
     fn jet_mass_rate_per_steradian(&self, r: f64, q: f64) -> f64 {
         let engine_gamma = f64::sqrt(1.0 + self.engine_u * self.engine_u);
         let e = self.engine_energy;
-        let l = e / (self.eta_0 * 4.0 * PI * self.engine_duration);
+        let l = e / (4.0 * PI * self.engine_duration);
         l / (engine_gamma * LIGHT_SPEED * LIGHT_SPEED)
     }
 }

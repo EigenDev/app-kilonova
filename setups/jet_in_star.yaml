@@ -20,7 +20,7 @@ mesh:
   inner_radius: 1.e9
   outer_radius: 1.e12
   excision_delay: 10.0
-  inner_excision_speed: 3e9
+  inner_excision_speed: 1e8
   outer_excision_speed: 3e10
   reference_radius: 1.e9
   num_polar_zones: 64

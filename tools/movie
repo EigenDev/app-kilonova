@@ -11,6 +11,9 @@ import os
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
+STEFAN_BOLTZMANN_CONSTANT = 5.67037442e-05
+LIGHT_SPEED               = 2.99792458e+10
+
 class timed(object): 
     def __init__(self, message):
         self.message = message
@@ -50,71 +53,70 @@ def mesh_vertices(products):
 
 
 def known_fields():
-    ['rho', 'pre', 'ur', 'uq', 'scalar', 'gamma_beta', 'temperature']
+    return ['rho', 'pre', 'ur', 'uq', 'scalar_density', 
+            'scalar_concentration', 'energy', 'gamma_beta', 'temperature']
 
-def radial_field(products, field, tidx, *args):
+
+
+def block_field(block, field):
+
+    sigma = STEFAN_BOLTZMANN_CONSTANT
+    c = LIGHT_SPEED
+
     if field == 'rho':
-        d = products.radial_profile[tidx].comoving_mass_density
+        return block.comoving_mass_density
+
     elif field == 'pre':
-        d = products.radial_profile[tidx].gas_pressure
-    elif field == 'ur':
-        d = products.radial_profile[tidx].radial_four_velocity
-    elif field == 'uq':
-        d = products.radial_profile[tidx].polar_four_velocity
-    elif field == 'scalar':
-        d = products.radial_profile[tidx].scalar
-    elif field == 'gamma_beta':
-        ur = products.radial_profile[tidx].radial_four_velocity
-        uq = products.radial_profile[tidx].polar_four_velocity
-        d = np.sqrt(ur**2 + uq**2)
-    elif field == 'temperature':
-        from astropy import constants
-        c = constants.c.cgs.value
-        sig = constants.sigma_sb.cgs.value
-        a   = (4.*sig/c)
-        # Radiation Dominated Temperature in K
-        d = (3*products.radial_profile[tidx].gas_pressure*c**2/a)**(1./4.)
-        
-    else:
-        raise ValueError(f'unknown field {field}')
-    return d
+        # Note: block.gas_pressure is in units of g / cm^3. Multiply by c^2 to
+        # put it in erg / cm^3.
+        return block.gas_pressure
 
-def block_field(block, field, transform=lambda x: x):
-    if field == 'rho':
+    elif field == 'ur':
+        return block.radial_four_velocity
+
+    elif field == 'uq':
+        return block.polar_four_velocity
+
+    elif field == 'scalar_concentration':
+        return block.scalar
+
+    elif field == 'scalar_density':
+        # Return the lab-frame (not comoving) scalar volume density.
+        u = block.radial_four_velocity
+        w = block.polar_four_velocity
+        G = (1.0 + u**2 + w**2)**0.5
+        return block.scalar * block.comoving_mass_density * G
+
+    elif field == 'energy':
+        # Return the total gas energy. Assumes the gamma-law index is 4/3.
+        p = block.gas_pressure * c**2
         d = block.comoving_mass_density
-    elif field == 'pre':
-        d = block.gas_pressure
-    elif field == 'ur':
-        d = block.radial_four_velocity
-    elif field == 'uq':
-        d = block.polar_four_velocity
-    elif field == 'scalar':
-        d = block.scalar
+        u = block.radial_four_velocity
+        w = block.polar_four_velocity
+        G = (1.0 + u**2 + w**2)**0.5
+        e = p / d / (4 / 3 - 1)
+        h = c**2 + e + p / d
+        return d * h * G**2 - p - G * d * c**2
+
     elif field == 'gamma_beta':
         ur = block.radial_four_velocity
         uq = block.polar_four_velocity
-        d = np.sqrt(ur**2 + uq**2)
+        return np.sqrt(ur**2 + uq**2)
+
     elif field == 'temperature':
-        from astropy import constants
-        
-        c = (constants.c.cgs).value
-        
-        sig = (constants.sigma_sb.cgs).value
-        a   = (4.*sig/c)
-        
-        # Radiation Dominated Temperature in K
-        d = (3*block.gas_pressure*c**2/a)**(1./4.)
-        
-    else:
-        raise ValueError(f'unknown field {field}')
-    return transform(d)
+        # Return the gas temperature in K. Assumes radiation dominated gas.
+        a = 4.0 * sigma / c
+        p = block.gas_pressure * c**2
+        return (3 * p / a)**0.25
+
+    raise ValueError(f'unknown field {field}')
 
 
 def mesh_field(products, field, transform=lambda x: x):
-    return [block_field(products[k], field, transform) for k in products]
+    return [transform(block_field(products[k], field)) for k in products]
 
 
-def variable(args):
+def label_name(args):
     if args.field == 'rho' and args.log:
         return r'$\log_{{10}}(\rho) \ [\rm{{g/cm^3}}]$'
     elif args.field == 'temperature' and args.log:
@@ -137,39 +139,39 @@ def plot_two_dimensional(products, fig, ax1, cbaxes, args):
     for (x, z), c in zip(vertices, field):
         cm = ax1.pcolormesh(x, z, c, vmin=vmin, vmax=vmax, edgecolors='none', lw=0.5, cmap=args.cmap)
 
+    if args.radius is not None:
+        ax1.set_xlim(0, args.radius)
+        ax1.set_ylim(-args.radius, args.radius)
     ax1.set_xlabel(r'$x \ [\rm{cm}]$')
     ax1.set_ylabel(r'$z \ [\rm{cm}]$')
 
     ax1.set_aspect('equal')
     fig.colorbar(cm, cax = cbaxes)
     fig.subplots_adjust(left=0, right=1, top=0.9, bottom=0.05)
-    fig.suptitle(r'Setup: $\mathtt{{{}}}$   {}   $t = {:.4}s$'.format(setup.replace('_', '-'), variable(args), products.time))
+    fig.suptitle(r'Setup: $\mathtt{{{}}}$   {}   $t = {:.4}s$'.format(setup.replace('_', '-'), label_name(args), products.time))
     return fig
 
 def plot_radial_profile(products,fig, ax1, args):
-    field = args.field 
-    
+    field = args.field
+
     if args.theta_index is None:
         r = products.radial_profile.vertices
-        d = products.radial_profile[0].comoving_mass_density
+        d = block_field(products.radial_profile[0], args.field)
     else:
         r  = products.radial_profile.vertices
         polar_vertices_size = np.asarray(mesh_vertices(products)).shape[-1]
         q = np.linspace(0, 2*np.pi, polar_vertices_size)
-        
         setup = next(iter(products.config['model']))
         tidx  = args.theta_index
-        d = radial_field(products, args.field,tidx, args) 
-        
-        ax1.set_title(r'Setup: $\mathtt{{{}}}$    $\theta={:.2f}$   $t = {:.4}s$'.format(setup.replace('_', '-'), 
-                                                                                         q[tidx], products.time))
-        ax1.set_ylabel('{}'.format(variable(args)))
-        
-        
+        d = block_field(products.radial_profile[tidx], args.field)
+
+    ax1.set_title(r'Setup: $\mathtt{{{}}}$    $\theta={:.2f}$   $t = {:.4}s$'.format(setup.replace('_', '-'), q[tidx], products.time), fontsize=20)
+    ax1.set_ylabel(label_name(args), fontsize=15)
     ax1.plot(r, d, '-o', mfc='none')
+    ax1.set_xlim(r[0], r[-1])
     ax1.set_xscale('log')
     ax1.set_yscale('log')
-    ax1.set_xlabel(r'$r \ \rm{[cm]}$')
+    ax1.set_xlabel(r'$r \ \rm{[cm]}$', fontsize=15)
     return fig
 
 
@@ -187,8 +189,6 @@ def main():
     parser.add_argument('-tidx', '--theta_index', default=None, type=int)
     args = parser.parse_args()
 
-    fig = plt.figure(figsize=(9,9))
-    ax  = fig.add_subplot(111)
     cbaxes = False 
     
     data_dir = args.data_dir[0]
@@ -198,14 +198,18 @@ def main():
 
     if products[0].config['mesh']['num_polar_zones'] > 1 and args.theta_index is None:
         fig = plt.figure(figsize=(8,11))
+        ax  = fig.add_subplot(111)
         divider = make_axes_locatable(ax)
         cax = divider.append_axes('right', size='5%', pad=0.1)
         cbaxes = True
+    else:
+        fig = plt.figure(figsize=(9,9))
+        ax  = fig.add_subplot(111)
         
     def init_mesh():
         if args.theta_index is not None:
             init_fig = plot_radial_profile(products[0], fig, ax, args)
-        elif products.config['mesh']['num_polar_zones'] > 1:
+        elif products[0].config['mesh']['num_polar_zones'] > 1:
             init_fig = plot_two_dimensional(products[0], fig, ax, cax, args)
         else:
             init_fig = plot_radial_profile(products[0], fig, ax, args)
@@ -224,7 +228,7 @@ def main():
         
         if args.theta_index is not None:
             fig_frame = plot_radial_profile(products[frame], fig, ax, args)
-        elif products.config['mesh']['num_polar_zones'] > 1:
+        elif products[frame].config['mesh']['num_polar_zones'] > 1:
             fig_frame = plot_two_dimensional(products[frame], fig, ax, cax, args)
         else:
             fig_frame = plot_radial_profile(products[frame], fig, ax, args)

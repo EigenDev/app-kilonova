@@ -12,18 +12,17 @@ use crate::traits::InitialModel;
 // source: https://arxiv.org/pdf/1407.8250.pdf
 static R0:                  f64 = 7e10;
 static M0:                  f64 = 2e33;
-static RHO_C:               f64 = 3e7 * M0 / (1.33 * PI * R0 * R0 * R0);
+static RHO_REF:             f64 = 3.0 * M0 / (4.0 *PI * R0 * R0 * R0);
+static RHO_C:               f64 = 3e7 * RHO_REF;
 static R1:                  f64 = 0.0017 * R0;
 static R2:                  f64 = 0.0125 * R0;
 static R3:                  f64 = 0.65   * R0;
 static K1:                  f64 = 3.24;
 static K2:                  f64 = 2.57;
 static N:                   f64 = 16.7;
-static RHO_WIND:            f64 = 1e-9 * M0 / (1.33 * PI * R0 * R0 * R0);
-static RHO_ENV:             f64 = 1e-7 * M0 / (1.33 * PI * R0 * R0 * R0);
+static RHO_WIND:            f64 = 1e-9 * RHO_REF;
 static R_NOZZ:              f64 = 0.01 * R0; 
 static ALPHA:               f64 = 2.5;
-
 
 
 
@@ -56,9 +55,6 @@ pub struct JetInStar {
     /// Energy-to-mass ratio of progenitor
     pub eta_0: f64, 
 }
-
-
-
 
 /**
  * Different space-time zones in the setup
@@ -98,10 +94,10 @@ impl InitialModel for JetInStar {
         let (r, q) = coordinate;
 
         match self.zone(r, q, t) {
-            Zone::Core     => 1.0,
-            Zone::Jet      => 1.0,
+            Zone::Core     => 0.0,
+            Zone::Jet      => 0.0,
             Zone::Envelope => 1e2,
-            Zone::Wind     => 1.0,
+            Zone::Wind     => 0.0,
         }
     }
 }
@@ -112,7 +108,6 @@ impl InitialModel for JetInStar {
 // ============================================================================
 impl JetInStar
 {
-
     /**
      * The comoving mass density in g/cc
      */
@@ -122,15 +117,17 @@ impl JetInStar
         let denom     = 1.0 + (r / R1).powf(K1) / (1.0 + (r / R2).powf(K2));
         let core_zone = num/denom;
 
+        // Calculate mean density of Helium core surface: Bromberg et al. (2011)
+        let rho_bar   = self.star_mass * (3.0 - ALPHA) / (4.0 * PI * R3 * R3 * R3);
+        
         // To ensure continuity in the density from one zone to another we add
         // their contributions until each zone "falls off"
-
         match zone {
             Zone::Core => {
-                core_zone + RHO_ENV * (r / R3).powf(-ALPHA) + RHO_WIND * (r / self.envelope_radius).powf(-2.0)
+                core_zone + rho_bar * (r / R3).powf(-ALPHA) + RHO_WIND * (r / self.envelope_radius).powf(-2.0)
             }
             Zone::Envelope => {
-                RHO_ENV * (r / R3).powf(-ALPHA) + RHO_WIND * (r / self.envelope_radius).powf(-2.0)
+                rho_bar * (r / R3).powf(-ALPHA) + RHO_WIND * (r / self.envelope_radius).powf(-2.0)
             }
             Zone::Jet => {
                 self.jet_mass_rate_per_steradian() / (r * r * self.engine_u * LIGHT_SPEED)

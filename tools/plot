@@ -92,9 +92,9 @@ def block_field(block, field):
         return block.polar_four_velocity
 
     elif field == 'scalar_concentration':
-        sclar = np.asarray(block.scalar)
-        scalar[sclar==0] = 1.e-10
-        return sclar
+        scalar = np.asarray(block.scalar)
+        scalar[scalar==0] = 1.e-10
+        return scalar
 
     elif field == 'scalar_density':
         # Return the lab-frame (not comoving) scalar volume density.

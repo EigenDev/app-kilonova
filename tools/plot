@@ -202,7 +202,7 @@ def plot_radial_profile(products, args, overplot=False, ax1=None):
 
     ax1.set_title(r'Setup: $\mathtt{{{}}}$    $\theta={:.2f}$'.format(setup.replace('_', '-'), q[tidx]), fontsize=20)
     ax1.set_ylabel(label_name(args), fontsize=15)
-    ax1.plot(r, d, '-o', mfc='none', label=r'$t = {:.4}s'.format(products.time))
+    ax1.plot(r, d, '-o', mfc='none', label=r'$t = {:.4}s$'.format(products.time))
     ax1.set_xlim(r[0], r[-1])
     ax1.set_xscale('log')
     ax1.set_yscale('log')

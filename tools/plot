@@ -188,7 +188,7 @@ def plot_radial_profile(products, args, overplot=False, ax1=None):
         ax1 = fig.add_subplot(1, 1, 1)
         
     field = args.field
-
+    setup = next(iter(products.config['model']))
     if args.theta_index is None:
         r = products.radial_profile.vertices
         d = block_field(products.radial_profile[0], args.field)
@@ -196,11 +196,11 @@ def plot_radial_profile(products, args, overplot=False, ax1=None):
         r  = products.radial_profile.vertices
         polar_vertices_size = np.asarray(mesh_vertices(products)).shape[-1]
         q = np.linspace(0, np.pi, polar_vertices_size)
-        setup = next(iter(products.config['model']))
         tidx  = args.theta_index
         d = block_field(products.radial_profile[tidx], args.field)
 
-    ax1.set_title(r'Setup: $\mathtt{{{}}}$    $\theta={:.2f}$'.format(setup.replace('_', '-'), q[tidx]), fontsize=20)
+    viewing_angle = np.pi/2 if not args.theta_index else q[tidx]
+    ax1.set_title(r'Setup: $\mathtt{{{}}}$    $\theta={:.2f}$'.format(setup.replace('_', '-'), viewing_angle), fontsize=20)
     ax1.set_ylabel(label_name(args), fontsize=15)
     ax1.plot(r, d, '-o', mfc='none', label=r'$t = {:.4}s$'.format(products.time))
     ax1.set_xlim(r[0], r[-1])

@@ -182,9 +182,11 @@ def plot_two_dimensional(products, args):
 
 
 
-def plot_radial_profile(products, args):
-    fig = plt.figure(figsize=[9, 9])
-    ax1 = fig.add_subplot(1, 1, 1)
+def plot_radial_profile(products, args, overplot=False, ax1=None):
+    if not overplot:
+        fig = plt.figure(figsize=[9, 9])
+        ax1 = fig.add_subplot(1, 1, 1)
+        
     field = args.field
 
     if args.theta_index is None:
@@ -198,14 +200,16 @@ def plot_radial_profile(products, args):
         tidx  = args.theta_index
         d = block_field(products.radial_profile[tidx], args.field)
 
-    ax1.set_title(r'Setup: $\mathtt{{{}}}$    $\theta={:.2f}$   $t = {:.4}s$'.format(setup.replace('_', '-'), q[tidx], products.time), fontsize=20)
+    ax1.set_title(r'Setup: $\mathtt{{{}}}$    $\theta={:.2f}$'.format(setup.replace('_', '-'), q[tidx]), fontsize=20)
     ax1.set_ylabel(label_name(args), fontsize=15)
-    ax1.plot(r, d, '-o', mfc='none')
+    ax1.plot(r, d, '-o', mfc='none', label=r'$t = {:.4}s'.format(products.time))
     ax1.set_xlim(r[0], r[-1])
     ax1.set_xscale('log')
     ax1.set_yscale('log')
     ax1.set_xlabel(r'$r \ \rm{[cm]}$', fontsize=15)
-    return fig
+    if not overplot:
+        ax1.set_title(r'Setup: $\mathtt{{{}}}$    $\theta={:.2f}$   $t = {:.4}s$'.format(setup.replace('_', '-'), q[tidx], products.time), fontsize=20)
+        return fig
 
 
 
@@ -223,15 +227,26 @@ def main():
     parser.add_argument('-tidx', '--theta_index', default=None, type=int)
     args = parser.parse_args()
 
-    filename = args.filenames[0]
-    products = load_products(filename)
+    if len(args.filenames) == 1:
+        filename = args.filenames[0]
+        products = load_products(filename)
 
-    if args.theta_index is not None:
-        fig = plot_radial_profile(products, args)
-    elif products.config['mesh']['num_polar_zones'] > 1:
-        fig = plot_two_dimensional(products, args)
+        if args.theta_index is not None:
+            fig = plot_radial_profile(products, args)
+        elif products.config['mesh']['num_polar_zones'] > 1:
+            fig = plot_two_dimensional(products, args)
+        else:
+            fig = plot_radial_profile(products, args)
     else:
-        fig = plot_radial_profile(products, args)
+        fig = plt.figure(figsize=[9, 9])
+        ax1 = fig.add_subplot(1, 1, 1)
+        for filename in args.filenames:
+            products = load_products(filename)
+            
+            plot_radial_profile(products, args, overplot=True, ax1=ax1)
+            
+        ax1.legend()
+            
 
     with timed('show'):
         if args.hardcopy or args.output is not None:

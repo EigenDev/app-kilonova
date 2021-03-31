@@ -92,14 +92,18 @@ def block_field(block, field):
         return block.polar_four_velocity
 
     elif field == 'scalar_concentration':
-        return block.scalar
+        sclar = np.asarray(block.scalar)
+        scalar[sclar==0] = 1.e-10
+        return sclar
 
     elif field == 'scalar_density':
         # Return the lab-frame (not comoving) scalar volume density.
         u = block.radial_four_velocity
         w = block.polar_four_velocity
         G = (1.0 + u**2 + w**2)**0.5
-        return block.scalar * block.comoving_mass_density * G
+        bscalar = np.asarray(block.scalar * block.comoving_mass_density * G)
+        bscalar[bscalar == 0] = 1.e-10
+        return bscalar
 
     elif field == 'energy':
         # Return the total gas energy. Assumes the gamma-law index is 4/3.

@@ -193,7 +193,7 @@ def plot_radial_profile(products, args):
     else:
         r  = products.radial_profile.vertices
         polar_vertices_size = np.asarray(mesh_vertices(products)).shape[-1]
-        q = np.linspace(0, 2*np.pi, polar_vertices_size)
+        q = np.linspace(0, np.pi, polar_vertices_size)
         setup = next(iter(products.config['model']))
         tidx  = args.theta_index
         d = block_field(products.radial_profile[tidx], args.field)

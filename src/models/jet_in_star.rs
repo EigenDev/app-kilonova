@@ -20,7 +20,7 @@ static R3:                  f64 = 0.65   * R0;
 static K1:                  f64 = 3.24;
 static K2:                  f64 = 2.57;
 static N:                   f64 = 16.7;
-static RHO_WIND:            f64 = 1e-6 * RHO_REF;
+static RHO_WIND:            f64 = 1e-9 * RHO_REF;
 static R_NOZZ:              f64 = 0.01 * R0; 
 static ALPHA:               f64 = 2.5;
 
@@ -124,10 +124,10 @@ impl JetInStar
         // their contributions until each zone "falls off"
         match zone {
             Zone::Core => {
-                core_zone + rho_bar * (r / R3).powf(-ALPHA) + RHO_WIND * (r / self.envelope_radius).powf(-2.0)
+                core_zone + rho_bar * (r / R3).powf(-ALPHA) * (1.0 - r / self.envelope_radius).powf(N/2.0) + RHO_WIND * (r / self.envelope_radius).powf(-2.0)
             }
             Zone::Envelope => {
-                rho_bar * (r / R3).powf(-ALPHA) + RHO_WIND * (r / self.envelope_radius).powf(-2.0)
+                rho_bar * (r / R3).powf(-ALPHA) * (1.0 - r / self.envelope_radius).powf(N/2.0) + RHO_WIND * (r / self.envelope_radius).powf(-2.0)
             }
             Zone::Jet => {
                 self.jet_mass_rate_per_steradian() / (r * r * self.engine_u * LIGHT_SPEED)

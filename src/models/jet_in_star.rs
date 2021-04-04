@@ -20,7 +20,7 @@ static R3:                  f64 = 0.65   * R0;
 static K1:                  f64 = 3.24;
 static K2:                  f64 = 2.57;
 static N:                   f64 = 16.7;
-static RHO_WIND:            f64 = 1e-9 * RHO_REF;
+static RHO_WIND:            f64 = 1e-6 * RHO_REF;
 static R_NOZZ:              f64 = 0.01 * R0; 
 static ALPHA:               f64 = 2.5;
 

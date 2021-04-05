@@ -175,9 +175,8 @@ impl JetInStar
     pub fn zone(&self, r: f64, q: f64, t: f64) -> Zone {
         let v_jet = self.engine_beta() * LIGHT_SPEED;
         let r_jet_head = v_jet * t;
-        let r_jet_tail = v_jet * (t - self.engine_duration);
 
-        if self.in_nozzle(q) && (r_jet_tail..r_jet_head).contains(&r) {
+        if self.in_nozzle(q) && r < r_jet_head {
             Zone::Jet
         } else if r < R3 {
             Zone::Core
@@ -197,7 +196,7 @@ impl JetInStar
      */
     pub fn gamma_beta(&self, r: f64, q: f64, t: f64) -> f64 {
         match self.zone(r, q, t) {
-            Zone::Jet => self.engine_u,
+            Zone::Jet => self.engine_u * f64::exp(-t/self.engine_duration),
             _ => 0.0
         }
     }

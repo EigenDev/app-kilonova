@@ -188,6 +188,16 @@ impl JetInStar
     }
 
     /**
+     * Return the sigmoid function to create a smooth step function
+     * to turn off the jet.
+     *
+     * * `t` - The time
+     */
+    pub fn sigmoid(&self, t: f64) -> f64 {
+        1.0 / (1.0 + f64::exp(10.0 * (t - self.engine_duration) ) )
+    }
+
+    /**
      * Return the radial four-velocity (gamma-beta).
      *
      * * `r` - The radius
@@ -196,7 +206,7 @@ impl JetInStar
      */
     pub fn gamma_beta(&self, r: f64, q: f64, t: f64) -> f64 {
         match self.zone(r, q, t) {
-            Zone::Jet => self.engine_u * f64::exp(-t/self.engine_duration),
+            Zone::Jet => self.engine_u * self.sigmoid(t),
             _ => 0.0
         }
     }

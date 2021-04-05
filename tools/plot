@@ -199,7 +199,7 @@ def plot_radial_profile(products, args, overplot=False, ax1=None):
         tidx  = args.theta_index
         d = block_field(products.radial_profile[tidx], args.field)
 
-    viewing_angle = np.pi/2 if not args.theta_index else q[tidx]
+    viewing_angle = np.pi/2 if args.theta_index is None else q[tidx]
     ax1.set_title(r'Setup: $\mathtt{{{}}}$    $\theta={:.2f}$'.format(setup.replace('_', '-'), viewing_angle), fontsize=20)
     ax1.set_ylabel(label_name(args), fontsize=15)
     ax1.plot(r, d, '-o', mfc='none', label=r'$t = {:.4}s$'.format(products.time))

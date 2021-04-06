@@ -80,7 +80,7 @@ impl InitialModel for JetInStar {
         let (r, q) = coordinate;
         let d = self.mass_density(r, q, t);
         let u = self.gamma_beta(r, q, t);
-        let p = 1e-10;
+        let p = 1e-5;
 
         AnyPrimitive {
             velocity_r: u,

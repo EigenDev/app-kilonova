@@ -6,7 +6,7 @@ use crate::traits::InitialModel;
 
 
 
-// static UNIFORM_TEMPERATURE: f64 = 1e-6;
+static UNIFORM_TEMPERATURE: f64 = 1e-6;
 
 // Constants as given in Duffell & MacDayen(2015)
 // source: https://arxiv.org/pdf/1407.8250.pdf
@@ -80,7 +80,7 @@ impl InitialModel for JetInStar {
         let (r, q) = coordinate;
         let d = self.mass_density(r, q, t);
         let u = self.gamma_beta(r, q, t);
-        let p = 1e-5;
+        let p = d*UNIFORM_TEMPERATURE;
 
         AnyPrimitive {
             velocity_r: u,

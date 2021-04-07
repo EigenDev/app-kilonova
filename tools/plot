@@ -214,8 +214,7 @@ def plot_radial_profile(products, args, overplot=False, ax1=None):
 def plot_hist(products, args):
     fig = plt.figure(figsize=[9, 9], constrained_layout=False)
     ax1 = fig.add_subplot(1, 1, 1)
-    # ax2 = fig.add_subplot(2, 1, 1)
-    # ax3 = fig.add_subplot(3, 1, 1)
+
     
     with timed('make vertices and fields'):
         r        = np.asarray(products.radial_profile.vertices)
@@ -251,10 +250,10 @@ def plot_hist(products, args):
         eks = np.asarray([e_k[np.where(u > gb)].sum() for gb in gbs])
         ets = np.asarray([e[np.where(u > gb)].sum() for gb in gbs])
         
-        ax1.hist(gbs, bins=n, weights=eks, alpha=0.6, color = 'red', label= r'$E_k$')
-        ax1.hist(gbs, bins=n, weights=ets, alpha=0.6, color = 'blue', label= r'$E_{\rm tot}$')
+        ax1.hist(gbs, bins=n, weights=eks, alpha=0.5, color="red", label= r'$E_k$', ec='white')
+        ax1.hist(gbs, bins=n, weights=ets, alpha=0.5, color="blue", label= r'$E_{\rm tot}$', ec='white')
             
-    plt.yscale('log', nonpositive='clip')
+    plt.yscale('log')
     ax1.set_xlabel(r'$\Gamma\beta $', fontsize=20)
     ax1.set_ylabel(r'$E \ [\rm{erg}]$', fontsize=20)
     ax1.tick_params('both', labelsize=20)

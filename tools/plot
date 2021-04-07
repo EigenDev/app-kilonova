@@ -55,7 +55,7 @@ def load_products(filename):
 
 def block_vertices(block, *args):
     R, Q = [x.T for x in np.meshgrid(block.radial_vertices, block.polar_vertices)]
-    return R * np.sin(Q), R * np.cos(Q)
+    return R, Q
 
 
 
@@ -198,7 +198,7 @@ def plot_radial_profile(products, args, overplot=False, ax1=None):
         q = np.linspace(0, np.pi, polar_vertices_size)
         tidx  = args.theta_index
         d = block_field(products.radial_profile[tidx], args.field)
-
+    vmin, vmax = eval(args.range)
     viewing_angle = np.pi/2 if args.theta_index is None else q[tidx]
     ax1.set_title(r'Setup: $\mathtt{{{}}}$    $\theta={:.2f}$'.format(setup.replace('_', '-'), viewing_angle), fontsize=20)
     ax1.set_ylabel(label_name(args), fontsize=15)
@@ -211,6 +211,59 @@ def plot_radial_profile(products, args, overplot=False, ax1=None):
         ax1.set_title(r'Setup: $\mathtt{{{}}}$    $\theta={:.2f}$   $t = {:.4}s$'.format(setup.replace('_', '-'), q[tidx], products.time), fontsize=20)
         return fig
 
+def plot_hist(products, args):
+    fig = plt.figure(figsize=[9, 9], constrained_layout=False)
+    ax1 = fig.add_subplot(1, 1, 1)
+    # ax2 = fig.add_subplot(2, 1, 1)
+    # ax3 = fig.add_subplot(3, 1, 1)
+    
+    with timed('make vertices and fields'):
+        r        = np.asarray(products.radial_profile.vertices)
+        field = np.asarray(mesh_field(products, args.field, np.log10 if args.log else lambda x: x))
+        u     = np.asarray(mesh_field(products, "gamma_beta", np.log10 if args.log else lambda x: x))
+        setup = next(iter(products.config['model']))
+        tau   = np.asarray(mesh_field(products, "energy", np.log10 if args.log else lambda x: x))
+        
+        # Flatten along the radial blocks 
+        polar_vertices_size = np.asarray(mesh_vertices(products)).shape[-1]
+        q  = np.linspace(0, np.pi, polar_vertices_size - 1)
+        dr = r[1:] - r[:-1]
+        
+        field_per_volume = field.reshape(-1, field.shape[-1])
+        u = u.reshape(-1, u.shape[-1])
+        
+        dV = np.zeros(field_per_volume.shape)
+        for idx in range(q.size - 1):
+            cell_volume = 2 * np.pi * r**2 * np.append(dr, dr[-1]) * (np.cos(q[idx]) - np.cos(q[idx + 1]))
+            dV[:, idx] = cell_volume
+            
+        tau = tau.reshape(-1, tau.shape[-1])
+        
+        e   = tau * dV
+        scalar_field = np.sqrt(1 + u**2) * dV * field_per_volume
+        
+        e_k = (np.sqrt(1 + u**2) - 1) * scalar_field * LIGHT_SPEED**2 
+        
+    with timed('load plots'):
+        w = 1   # Bin Width
+        gbs = np.linspace(u.min(), u.max(), r.size)
+        n   = int( np.ceil((u.max() - u.min())/w) )
+        eks = np.asarray([e_k[np.where(u > gb)].sum() for gb in gbs])
+        ets = np.asarray([e[np.where(u > gb)].sum() for gb in gbs])
+        
+        ax1.hist(gbs, bins=n, weights=eks, alpha=0.6, color = 'red', label= r'$E_k$')
+        ax1.hist(gbs, bins=n, weights=ets, alpha=0.6, color = 'blue', label= r'$E_{\rm tot}$')
+            
+    plt.yscale('log', nonpositive='clip')
+    ax1.set_xlabel(r'$\Gamma\beta $', fontsize=20)
+    ax1.set_ylabel(r'$E \ [\rm{erg}]$', fontsize=20)
+    ax1.tick_params('both', labelsize=20)
+    ax1.spines['right'].set_visible(False)
+    ax1.spines['top'].set_visible(False)
+    ax1.set_xlim(gbs.min(), gbs.max())
+    ax1.legend(fontsize=30)
+    ax1.set_title(r'Setup: $\mathtt{{{}}}$  $t = {:.4}s$'.format(setup.replace('_', '-'), products.time), fontsize=30)
+    return fig
 
 
 
@@ -225,13 +278,16 @@ def main():
     parser.add_argument('--output', '-o', default=None, type=str)
     parser.add_argument('--radius', default=None, type=float)
     parser.add_argument('-tidx', '--theta_index', default=None, type=int)
+    parser.add_argument('--hist', default=False, action='store_true')
     args = parser.parse_args()
 
     if len(args.filenames) == 1:
         filename = args.filenames[0]
         products = load_products(filename)
 
-        if args.theta_index is not None:
+        if args.hist:
+            fig = plot_hist(products, args)
+        elif args.theta_index is not None:
             fig = plot_radial_profile(products, args)
         elif products.config['mesh']['num_polar_zones'] > 1:
             fig = plot_two_dimensional(products, args)

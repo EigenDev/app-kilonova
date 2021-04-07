@@ -55,7 +55,7 @@ def load_products(filename):
 
 def block_vertices(block, *args):
     R, Q = [x.T for x in np.meshgrid(block.radial_vertices, block.polar_vertices)]
-    return R, Q
+    return R * np.sin(Q), R * np.cos(Q)
 
 
 
@@ -195,7 +195,7 @@ def plot_radial_profile(products, args, overplot=False, ax1=None):
     else:
         r  = products.radial_profile.vertices
         polar_vertices_size = np.asarray(mesh_vertices(products)).shape[-1]
-        q = np.linspace(0, np.pi, polar_vertices_size)
+        q = np.linspace(0, np.pi, polar_vertices_size - 1)
         tidx  = args.theta_index
         d = block_field(products.radial_profile[tidx], args.field)
     vmin, vmax = eval(args.range)
@@ -211,58 +211,59 @@ def plot_radial_profile(products, args, overplot=False, ax1=None):
         ax1.set_title(r'Setup: $\mathtt{{{}}}$    $\theta={:.2f}$   $t = {:.4}s$'.format(setup.replace('_', '-'), q[tidx], products.time), fontsize=20)
         return fig
 
-def plot_hist(products, args):
-    fig = plt.figure(figsize=[9, 9], constrained_layout=False)
-    ax1 = fig.add_subplot(1, 1, 1)
+def plot_hist(products, args, overplot=False, ax=None, case=None):
+    if not overplot:
+        fig = plt.figure(figsize=[9, 9], constrained_layout=False)
+        ax = fig.add_subplot(1, 1, 1)
 
     
     with timed('make vertices and fields'):
         r        = np.asarray(products.radial_profile.vertices)
-        field = np.asarray(mesh_field(products, args.field, np.log10 if args.log else lambda x: x))
-        u     = np.asarray(mesh_field(products, "gamma_beta", np.log10 if args.log else lambda x: x))
-        setup = next(iter(products.config['model']))
-        tau   = np.asarray(mesh_field(products, "energy", np.log10 if args.log else lambda x: x))
+        vertices = mesh_vertices(products)
+        field    = np.asarray(mesh_field(products, args.field, np.log10 if args.log else lambda x: x))
+        u        = np.asarray(mesh_field(products, "gamma_beta", np.log10 if args.log else lambda x: x))
+        setup    = next(iter(products.config['model']))
+        tau      = np.asarray(mesh_field(products, "energy", np.log10 if args.log else lambda x: x))
         
-        # Flatten along the radial blocks 
         polar_vertices_size = np.asarray(mesh_vertices(products)).shape[-1]
-        q  = np.linspace(0, np.pi, polar_vertices_size - 1)
-        dr = r[1:] - r[:-1]
+        qvertices  = np.linspace(0, np.pi, polar_vertices_size)
+        dcos    = np.cos(qvertices[:-1]) - np.cos(qvertices[1: ])
         
-        field_per_volume = field.reshape(-1, field.shape[-1])
-        u = u.reshape(-1, u.shape[-1])
-        
-        dV = np.zeros(field_per_volume.shape)
-        for idx in range(q.size - 1):
-            cell_volume = 2 * np.pi * r**2 * np.append(dr, dr[-1]) * (np.cos(q[idx]) - np.cos(q[idx + 1]))
-            dV[:, idx] = cell_volume
+        dV = np.zeros(field.shape)
+        # Convert vertices back to r, q and compute each cell volume
+        for idx, (x, z) in enumerate(vertices):
+            r_shell = np.asarray ( (x**2 + z**2)**0.5 )
+            dr      = r_shell[1: ] - r_shell[:-1]
             
-        tau = tau.reshape(-1, tau.shape[-1])
+            # There is an extra block in there that is not needed
+            # so it is deleted
+            dr = dr[:,:-1]
+            dV[idx, :] = 2 * np.pi * r_shell[:-1, :-1]**2 * dr * dcos
         
         e   = tau * dV
-        scalar_field = np.sqrt(1 + u**2) * dV * field_per_volume
-        
+        scalar_field = np.sqrt(1 + u**2) * dV * field
         e_k = (np.sqrt(1 + u**2) - 1) * scalar_field * LIGHT_SPEED**2 
         
     with timed('load plots'):
-        w = 1   # Bin Width
+        w = 1.0   # Bin Width  
         gbs = np.linspace(u.min(), u.max(), r.size)
-        n   = int( np.ceil((u.max() - u.min())/w) )
         eks = np.asarray([e_k[np.where(u > gb)].sum() for gb in gbs])
         ets = np.asarray([e[np.where(u > gb)].sum() for gb in gbs])
         
-        ax1.hist(gbs, bins=n, weights=eks, alpha=0.5, color="red", label= r'$E_k$', ec='white')
-        ax1.hist(gbs, bins=n, weights=ets, alpha=0.5, color="blue", label= r'$E_{\rm tot}$', ec='white')
-            
+        # ax.hist(gbs, bins=n, weights=eks, alpha=1.0, color="red", label= r'$E_k$', ec='r', histtype='step', rwidth=1.0, linewidth=3.0)
+        ax.hist(gbs, bins=np.arange(min(gbs), max(gbs) + w, w), weights=ets, alpha=1.0, label= r'case {}'.format(case), histtype='step', linewidth=3.0)
+        
     plt.yscale('log')
-    ax1.set_xlabel(r'$\Gamma\beta $', fontsize=20)
-    ax1.set_ylabel(r'$E \ [\rm{erg}]$', fontsize=20)
-    ax1.tick_params('both', labelsize=20)
-    ax1.spines['right'].set_visible(False)
-    ax1.spines['top'].set_visible(False)
-    ax1.set_xlim(gbs.min(), gbs.max())
-    ax1.legend(fontsize=30)
-    ax1.set_title(r'Setup: $\mathtt{{{}}}$  $t = {:.4}s$'.format(setup.replace('_', '-'), products.time), fontsize=30)
-    return fig
+    ax.set_xlabel(r'$\Gamma\beta $', fontsize=20)
+    ax.set_ylabel(r'$E ( > \Gamma \beta) \ [\rm{erg}]$', fontsize=20)
+    ax.tick_params('both', labelsize=20)
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.set_title(r'Setup: $\mathtt{{{}}}$  $t = {:.4}s$'.format(setup.replace('_', '-'), products.time), fontsize=30)
+    
+    if not overplot:
+        ax.legend(fontsize=30)
+        return fig
 
 
 
@@ -295,12 +296,21 @@ def main():
     else:
         fig = plt.figure(figsize=[9, 9])
         ax1 = fig.add_subplot(1, 1, 1)
-        for filename in args.filenames:
-            products = load_products(filename)
-            
-            plot_radial_profile(products, args, overplot=True, ax1=ax1)
-            
-        ax1.legend()
+        
+        if args.hist:
+            for idx, filename in enumerate(args.filenames):
+                products = load_products(filename)
+                
+                plot_hist(products, args, overplot=True, ax=ax1, case=idx)
+                
+            ax1.legend(fontsize=30)
+        else:
+            for filename in args.filenames:
+                products = load_products(filename)
+                
+                plot_radial_profile(products, args, overplot=True, ax1=ax1)
+                
+            ax1.legend()
             
 
     with timed('show'):

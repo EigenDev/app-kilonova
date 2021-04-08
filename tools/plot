@@ -245,24 +245,28 @@ def plot_hist(products, args, overplot=False, ax=None, case=None):
         e_k = (np.sqrt(1 + u**2) - 1) * scalar_field * LIGHT_SPEED**2 
         
     with timed('load plots'):
-        w = 1.0   # Bin Width  
+        w = 3.0  # Bin Width  
         gbs = np.linspace(u.min(), u.max(), r.size)
         eks = np.asarray([e_k[np.where(u > gb)].sum() for gb in gbs])
         ets = np.asarray([e[np.where(u > gb)].sum() for gb in gbs])
         
+        bins =  np.arange(min(gbs), max(gbs) + w, w)
+        logbins = np.logspace(np.log10(bins[0]),np.log10(bins[-1]),len(bins))
         # ax.hist(gbs, bins=n, weights=eks, alpha=1.0, color="red", label= r'$E_k$', ec='r', histtype='step', rwidth=1.0, linewidth=3.0)
-        ax.hist(gbs, bins=np.arange(min(gbs), max(gbs) + w, w), weights=ets, alpha=1.0, label= r'case {}'.format(case), histtype='step', linewidth=3.0)
+        ax.hist(gbs, bins=logbins, weights=ets, alpha=1.0, label= r'case {}'.format(case), histtype='step', linewidth=3.0)
         
+    plt.xscale('log')
     plt.yscale('log')
+    # ax.set_xlim(u.min(), u.max())
     ax.set_xlabel(r'$\Gamma\beta $', fontsize=20)
     ax.set_ylabel(r'$E ( > \Gamma \beta) \ [\rm{erg}]$', fontsize=20)
     ax.tick_params('both', labelsize=20)
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
-    ax.set_title(r'Setup: $\mathtt{{{}}}$  $t = {:.4}s$'.format(setup.replace('_', '-'), products.time), fontsize=30)
+    ax.set_title(r'Setup: $\mathtt{{{}}}$  $t = {:.4}s$'.format(setup.replace('_', '-'), products.time), fontsize=20)
     
     if not overplot:
-        ax.legend(fontsize=30)
+        ax.legend(fontsize=10)
         return fig
 
 
@@ -303,7 +307,7 @@ def main():
                 
                 plot_hist(products, args, overplot=True, ax=ax1, case=idx)
                 
-            ax1.legend(fontsize=30)
+            ax1.legend(fontsize=10, loc='upper left')
         else:
             for filename in args.filenames:
                 products = load_products(filename)

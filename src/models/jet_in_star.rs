@@ -21,6 +21,7 @@ static K1:                  f64 = 3.24;
 static K2:                  f64 = 2.57;
 static N:                   f64 = 16.7;
 static RHO_WIND:            f64 = 1e-9 * RHO_REF;
+static RHO_ISM:             f64 = 1e-6 * RHO_REF;
 static R_NOZZ:              f64 = 0.01 * R0; 
 static ALPHA:               f64 = 2.5;
 
@@ -52,8 +53,8 @@ pub struct JetInStar {
     /// Radius of the Envelope
     pub envelope_radius: f64,
 
-    /// Energy-to-mass ratio of progenitor
-    pub eta_0: f64, 
+    /// Distance to the ISM
+    pub ism_distance: f64, 
 }
 
 /**
@@ -64,6 +65,7 @@ pub enum Zone {
     Envelope,
     Wind,
     Jet,
+    ISM,
 }
 
 
@@ -98,6 +100,7 @@ impl InitialModel for JetInStar {
             Zone::Jet      => 0.0,
             Zone::Envelope => 1e2,
             Zone::Wind     => 0.0,
+            Zone::ISM      => 0.0,
         }
     }
 }
@@ -135,7 +138,9 @@ impl JetInStar
             Zone::Wind => {
                 RHO_WIND * (r / self.envelope_radius).powf(-2.0)
             }
-            
+            Zone::ISM =>  {
+                RHO_ISM
+            }
         }
     }
 
@@ -182,8 +187,10 @@ impl JetInStar
             Zone::Core
         } else if r < self.envelope_radius {
             Zone::Envelope
-        } else {
+        } else if r < self.ism_distance {
             Zone::Wind
+        } else {
+            Zone::ISM
         }
     }
 

@@ -14,7 +14,7 @@ model:
     engine_theta: 0.1
     engine_u: 50.0
     envelope_radius: 1e11
-    eta_0: 1.0
+    ism_distance: 1e15
 
 mesh:
   inner_radius: 1.e9

@@ -93,7 +93,8 @@ def block_field(block, field):
 
     elif field == 'scalar_concentration':
         scalar = np.asarray(block.scalar)
-        scalar[scalar==0] = 1.e-10
+        e = np.partition(scalar, 1)[1]
+        scalar[scalar < 1.e-15] = 0.0
         return scalar
 
     elif field == 'scalar_density':
@@ -102,7 +103,8 @@ def block_field(block, field):
         w = block.polar_four_velocity
         G = (1.0 + u**2 + w**2)**0.5
         bscalar = np.asarray(block.scalar * block.comoving_mass_density * G)
-        bscalar[bscalar == 0] = 1.e-10
+        e = np.partition(bscalar, 1)[1]
+        bscalar[bscalar < 1.e-20] = 1.e-100
         return bscalar
 
     elif field == 'energy':
@@ -133,18 +135,33 @@ def block_field(block, field):
 
 
 def mesh_field(products, field, transform=lambda x: x):
-    return [transform(block_field(products[k], field)) for k in products]
+    with np.errstate(divide='raise'):
+        try:
+            return [transform(block_field(products[k], field)) for k in products] # this gets caught and handled as an exception
+        except FloatingPointError:
+            # Ignore the 0 values of the block
+            res = [np.log10(block_field(products[k], field), out=np.zeros_like(block_field(products[k], field)), where=(block_field(products[k], field) != 0)) for k in products]
+            return res
+    
 
 
 
 
 def label_name(args):
-    if args.field == 'rho' and args.log:
-        return r'$\log_{{10}}(\rho) \ [\rm{{g/cm^3}}]$'
-    elif args.field == 'temperature' and args.log:
+    if args.field == 'rho':
+        if args.log:
+            return r'$\log_{{10}}(\rho) \ [\rm{{g/cm^3}}]$'
+        else:
+            return r'$\rho \ [\rm{{g/cm^3}}]$'
+    elif args.field == 'temperature':
         return 'T [K]'
-    elif args.field == 'gamma_beta' and args.log:
+    elif args.field == 'gamma_beta':
         return r'$\Gamma \beta$'
+    elif args.field == 'energy':
+        if args.domega:
+            return r'$d\tau/d\Omega \ [\rm{erg \ sr^{-1}}]$'
+        else:
+            return r'$\tau \ [\rm{erg}]$'
     else:
         return args.field
 
@@ -198,7 +215,7 @@ def plot_radial_profile(products, args, overplot=False, ax1=None):
         q = np.linspace(0, np.pi, polar_vertices_size - 1)
         tidx  = args.theta_index
         d = block_field(products.radial_profile[tidx], args.field)
-    vmin, vmax = eval(args.range)
+        
     viewing_angle = np.pi/2 if args.theta_index is None else q[tidx]
     ax1.set_title(r'Setup: $\mathtt{{{}}}$    $\theta={:.2f}$'.format(setup.replace('_', '-'), viewing_angle), fontsize=20)
     ax1.set_ylabel(label_name(args), fontsize=15)
@@ -211,7 +228,35 @@ def plot_radial_profile(products, args, overplot=False, ax1=None):
         ax1.set_title(r'Setup: $\mathtt{{{}}}$    $\theta={:.2f}$   $t = {:.4}s$'.format(setup.replace('_', '-'), q[tidx], products.time), fontsize=20)
         return fig
 
-def plot_hist(products, args, overplot=False, ax=None, case=None):
+def plot_angular_profile(products, args, overplot=False, ax=None):
+    if not overplot:
+        fig = plt.figure(figsize=[9, 9])
+        ax = fig.add_subplot(1, 1, 1)
+        
+    field = args.field
+    setup = next(iter(products.config['model']))
+    polar_vertices_size = np.asarray(mesh_vertices(products)).shape[-1]
+    q = np.linspace(0, 90, int( (polar_vertices_size - 1)/2) )
+    field_per_angle = np.zeros(q.shape)
+    for i in range(q.size):
+        field_per_angle[i] = np.sum(block_field(products.radial_profile[i], args.field))
+    
+    ax.set_title(r'Setup: $\mathtt{{{}}}$    $t = {:.4}s$'.format(setup.replace('_', '-'), products.time), fontsize=20)
+    ax.set_ylabel(label_name(args), fontsize=15)
+    ax.plot(q, field_per_angle, '-o', mfc='none', label=r'$t = {:.4}s$'.format(products.time))
+    
+    if args.log:
+        ax.set_yscale('log')
+        # ax.set_xscale('log')
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.set_xlim(q[0], q[-1])
+    ax.set_xlabel(r'$\theta $', fontsize=15)
+    
+    if not overplot:
+        return fig
+    
+def plot_hist(products, args, overplot=False, ax=None, case=0):
     if not overplot:
         fig = plt.figure(figsize=[9, 9], constrained_layout=False)
         ax = fig.add_subplot(1, 1, 1)
@@ -230,6 +275,7 @@ def plot_hist(products, args, overplot=False, ax=None, case=None):
         dcos    = np.cos(qvertices[:-1]) - np.cos(qvertices[1: ])
         
         dV = np.zeros(field.shape)
+        
         # Convert vertices back to r, q and compute each cell volume
         for idx, (x, z) in enumerate(vertices):
             r_shell = np.asarray ( (x**2 + z**2)**0.5 )
@@ -245,15 +291,17 @@ def plot_hist(products, args, overplot=False, ax=None, case=None):
         e_k = (np.sqrt(1 + u**2) - 1) * scalar_field * LIGHT_SPEED**2 
         
     with timed('load plots'):
-        w = 3.0  # Bin Width  
-        gbs = np.linspace(u.min(), u.max(), r.size)
+        w = np.diff(u).max()*1e-1
+        n = int (np.ceil(u.max() - u.min())/w)
+        gbs = np.logspace(np.log10(1.e-3), np.log10(u.max()), n)
         eks = np.asarray([e_k[np.where(u > gb)].sum() for gb in gbs])
         ets = np.asarray([e[np.where(u > gb)].sum() for gb in gbs])
         
-        bins =  np.arange(min(gbs), max(gbs) + w, w)
-        logbins = np.logspace(np.log10(bins[0]),np.log10(bins[-1]),len(bins))
-        # ax.hist(gbs, bins=n, weights=eks, alpha=1.0, color="red", label= r'$E_k$', ec='r', histtype='step', rwidth=1.0, linewidth=3.0)
-        ax.hist(gbs, bins=logbins, weights=ets, alpha=1.0, label= r'case {}'.format(case), histtype='step', linewidth=3.0)
+        bins    =  np.arange(min(gbs), max(gbs) + w, w)
+        logbins = np.logspace(np.log10(bins[0]),np.log10(bins[-1]), len(bins))
+
+        # ax.hist(gbs, bins=gbs, weights=ets, label= r'case {}'.format(case), histtype='step', rwidth=1.0, linewidth=3.0)
+        ax.hist(gbs, bins=gbs, weights=eks, alpha=0.8, label= r'case {}'.format(case), histtype='step', linewidth=3.0)
         
     plt.xscale('log')
     plt.yscale('log')
@@ -266,7 +314,6 @@ def plot_hist(products, args, overplot=False, ax=None, case=None):
     ax.set_title(r'Setup: $\mathtt{{{}}}$  $t = {:.4}s$'.format(setup.replace('_', '-'), products.time), fontsize=20)
     
     if not overplot:
-        ax.legend(fontsize=10)
         return fig
 
 
@@ -283,6 +330,7 @@ def main():
     parser.add_argument('--radius', default=None, type=float)
     parser.add_argument('-tidx', '--theta_index', default=None, type=int)
     parser.add_argument('--hist', default=False, action='store_true')
+    parser.add_argument('--domega', default=False, action='store_true')
     args = parser.parse_args()
 
     if len(args.filenames) == 1:
@@ -291,6 +339,8 @@ def main():
 
         if args.hist:
             fig = plot_hist(products, args)
+        elif args.domega:
+            fig = plot_angular_profile(products, args)
         elif args.theta_index is not None:
             fig = plot_radial_profile(products, args)
         elif products.config['mesh']['num_polar_zones'] > 1:
@@ -298,16 +348,24 @@ def main():
         else:
             fig = plot_radial_profile(products, args)
     else:
+        plt.style.use('seaborn-dark-palette')
         fig = plt.figure(figsize=[9, 9])
         ax1 = fig.add_subplot(1, 1, 1)
-        
         if args.hist:
             for idx, filename in enumerate(args.filenames):
                 products = load_products(filename)
                 
                 plot_hist(products, args, overplot=True, ax=ax1, case=idx)
                 
-            ax1.legend(fontsize=10, loc='upper left')
+            ax1.legend(fontsize=10, loc='upper right')
+        elif args.domega:
+            for idx, filename in enumerate(args.filenames):
+                products = load_products(filename)
+                
+                plot_angular_profile(products, args, overplot=True, ax=ax1)
+                
+            ax1.legend(fontsize=10, loc='upper right')
+            # fig = plot_angular_profile(products, args)
         else:
             for filename in args.filenames:
                 products = load_products(filename)

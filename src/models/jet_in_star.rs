@@ -24,6 +24,7 @@ static RHO_WIND:            f64 = 1e-9 * RHO_REF;
 static RHO_ISM:             f64 = 1e-6 * RHO_REF;
 static R_NOZZ:              f64 = 0.01 * R0; 
 static ALPHA:               f64 = 2.5;
+static YEAR_TO_SECS:        f64 = 3.154 * 1e7;
 
 
 
@@ -55,6 +56,12 @@ pub struct JetInStar {
 
     /// Distance to the ISM
     pub ism_distance: f64, 
+
+    /// Wind Velocity
+    pub wind_velocity: Option<f64>,
+
+    /// Mass loss rate in M_sun per yr
+    pub mass_loss_rate: Option<f64>,
 }
 
 /**
@@ -105,9 +112,6 @@ impl InitialModel for JetInStar {
     }
 }
 
-
-
-
 // ============================================================================
 impl JetInStar
 {
@@ -120,28 +124,43 @@ impl JetInStar
         let denom     = 1.0 + (r / R1).powf(K1) / (1.0 + (r / R2).powf(K2));
         let core_zone = num/denom;
 
-        // Calculate mean density of Helium core surface: Bromberg et al. (2011)
-        let rho_bar   = self.star_mass * (3.0 - ALPHA) / (4.0 * PI * R3 * R3 * R3);
-        
         // To ensure continuity in the density from one zone to another we add
         // their contributions until each zone "falls off"
         match zone {
             Zone::Core => {
-                core_zone + rho_bar * (r / R3).powf(-ALPHA) * (1.0 - r / self.envelope_radius).powf(N/2.0) + RHO_WIND * (r / self.envelope_radius).powf(-2.0)
+                core_zone + self.rho_bar() * (r / R3).powf(-ALPHA) * (1.0 - r / self.envelope_radius).powf(N/2.0) + self.rho_wind() * (r / self.envelope_radius).powf(-2.0)
             }
             Zone::Envelope => {
-                rho_bar * (r / R3).powf(-ALPHA) * (1.0 - r / self.envelope_radius).powf(N/2.0) + RHO_WIND * (r / self.envelope_radius).powf(-2.0)
+                self.rho_bar() * (r / R3).powf(-ALPHA) * (1.0 - r / self.envelope_radius).powf(N/2.0) + self.rho_wind() * (r / self.envelope_radius).powf(-2.0)
             }
             Zone::Jet => {
                 self.jet_mass_rate_per_steradian() / (r * r * self.engine_u * LIGHT_SPEED)
             }
             Zone::Wind => {
-                RHO_WIND * (r / self.envelope_radius).powf(-2.0)
+                self.rho_wind() * (r / self.envelope_radius).powf(-2.0)
             }
             Zone::ISM =>  {
                 RHO_ISM
             }
         }
+    }
+    /**
+     * Calculate the wind density
+     */
+    pub fn rho_wind(&self) -> f64 {
+        match (self.mass_loss_rate, self.wind_velocity) {
+            (Some(mdot), Some(vw)) => 24.0 * mdot * M0 / (4.0 * PI * vw * 1e5 * YEAR_TO_SECS * self.envelope_radius * self.envelope_radius),
+            _       => RHO_WIND,
+        }
+        
+    }
+
+    /**
+     * Calculate mean density at stellar surface according to:
+     * Bromberg et al. (2011)
+     */
+    pub fn rho_bar(&self) -> f64 {
+        self.star_mass * (3.0 - ALPHA) / (4.0 * PI * R3 * R3 * R3)
     }
 
     /**

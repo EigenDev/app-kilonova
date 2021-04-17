@@ -348,7 +348,6 @@ def main():
         else:
             fig = plot_radial_profile(products, args)
     else:
-        plt.style.use('seaborn-dark-palette')
         fig = plt.figure(figsize=[9, 9])
         ax1 = fig.add_subplot(1, 1, 1)
         if args.hist:

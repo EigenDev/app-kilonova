@@ -6,7 +6,7 @@ use crate::traits::InitialModel;
 
 
 
-static UNIFORM_TEMPERATURE: f64 = 1e-6;
+static UNIFORM_TEMPERATURE: f64 = 1e-3;
 
 // Constants as given in Duffell & MacDayen(2015)
 // source: https://arxiv.org/pdf/1407.8250.pdf
